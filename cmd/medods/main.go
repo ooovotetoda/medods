@@ -1,14 +1,17 @@
 package main
 
 import (
-	"clear-template/internal/config"
-	mwLogger "clear-template/internal/http-server/middleware/logger"
-	"clear-template/internal/lib/logger/sl"
-	"clear-template/internal/lib/logger/slogpretty"
-	"clear-template/internal/storage/postgres"
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"log/slog"
+	"medods/internal/config"
+	"medods/internal/http-server/handlers/refresh"
+	"medods/internal/http-server/handlers/save"
+	mwLogger "medods/internal/http-server/middleware/logger"
+	"medods/internal/lib/logger/sl"
+	"medods/internal/lib/logger/slogpretty"
+	"medods/internal/storage/mongo"
 	"net/http"
 	"os"
 )
@@ -27,11 +30,18 @@ func main() {
 	log.Info("App started", slog.String("env", cfg.Env))
 	log.Debug("Debugging started")
 
-	storage, err := postgres.New()
+	storage, err := mongo.New(cfg.Mongo.Uri)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
+
+	defer func() {
+		if err := storage.Close(); err != nil {
+			log.Error("failed to close storage", sl.Err(err))
+		}
+	}()
+
 	log.Info("storage successfully initialized")
 
 	router := chi.NewRouter()
@@ -42,7 +52,8 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	_ = storage
+	router.Get("/auth/{guid}", save.New(log, storage))
+	router.Post("/auth/refresh", refresh.New(log, storage))
 
 	log.Info("server started", slog.String("address", cfg.Address))
 
@@ -54,7 +65,7 @@ func main() {
 		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
 	}
 
-	if err := srv.ListenAndServe(); err != nil {
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Error("failed to start server", sl.Err(err))
 	}
 
