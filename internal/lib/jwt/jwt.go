@@ -9,15 +9,23 @@ import (
 	"time"
 )
 
-func NewAccessToken(guid string) (string, error) {
-	token := jwt.New(jwt.SigningMethodHS512)
+type Claims struct {
+	GUID string `json:"guid"`
+	jwt.RegisteredClaims
+}
 
-	claims := token.Claims.(jwt.MapClaims)
-	claims["guid"] = guid
-	claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
+func NewAccessToken(guid string) (string, error) {
+	expirationTime := time.Now().Add(5 * time.Minute)
+	claims := &Claims{
+		GUID: guid,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 
 	secretKey := os.Getenv("JWT_SECRET_KEY")
-
 	tokenString, err := token.SignedString([]byte(secretKey))
 	if err != nil {
 		return "", err
