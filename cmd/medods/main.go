@@ -53,7 +53,7 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	router.Get("/auth/{guid}", save.New(log, storage))
+	router.Post("/auth", save.New(log, storage))
 	router.Post("/auth/refresh", refresh.New(log, storage))
 
 	log.Info("server started", slog.String("address", cfg.Address))

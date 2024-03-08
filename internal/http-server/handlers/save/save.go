@@ -1,9 +1,9 @@
 package save
 
 import (
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"log/slog"
 	"medods/internal/lib/jwt"
@@ -14,6 +14,10 @@ import (
 
 	resp "medods/internal/lib/api/response"
 )
+
+type Request struct {
+	GUID string `json:"guid" validate:"required"`
+}
 
 type Response struct {
 	resp.Response
@@ -34,17 +38,32 @@ func New(log *slog.Logger, refreshTokenSaver RefreshTokenSaver) http.HandlerFunc
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		GUID := chi.URLParam(r, "guid")
-		if GUID == "" {
-			log.Error("GUID is empty")
+		var req Request
+
+		err := render.DecodeJSON(r.Body, &req)
+		if err != nil {
+			log.Error("failed to decode request body", sl.Err(err))
 
 			w.WriteHeader(http.StatusBadRequest)
-			render.JSON(w, r, resp.Error("invalid request"))
+			render.JSON(w, r, resp.Error("failed to decode request"))
 
 			return
 		}
 
-		parsedGUID, err := uuid.Parse(GUID)
+		log.Info("request body decoded", slog.Any("request", req))
+
+		if err := validator.New().Struct(req); err != nil {
+			validateErr := err.(validator.ValidationErrors)
+
+			log.Error("failed to validate request", sl.Err(err))
+
+			w.WriteHeader(http.StatusBadRequest)
+			render.JSON(w, r, resp.ValidationError(validateErr))
+
+			return
+		}
+
+		parsedGUID, err := uuid.Parse(req.GUID)
 		if err != nil {
 			log.Error("failed to parse GUID", sl.Err(err))
 
@@ -54,7 +73,7 @@ func New(log *slog.Logger, refreshTokenSaver RefreshTokenSaver) http.HandlerFunc
 			return
 		}
 
-		accessToken, err := jwt.NewAccessToken(GUID)
+		accessToken, err := jwt.NewAccessToken(req.GUID)
 		if err != nil {
 			log.Error("failed to generate access token", sl.Err(err))
 
