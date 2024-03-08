@@ -6,10 +6,11 @@ import (
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
 	"log/slog"
-	"medods/internal/domain/models"
 	"medods/internal/lib/jwt"
 	"medods/internal/lib/logger/sl"
+	"medods/internal/storage/models"
 	"net/http"
+	"time"
 
 	resp "medods/internal/lib/api/response"
 )
@@ -21,7 +22,7 @@ type Response struct {
 }
 
 type RefreshTokenSaver interface {
-	SaveRefreshTokenHash(authToken *models.Authorization) error
+	SaveRefreshTokenHash(authToken *models.Authorization, timeout time.Duration) error
 }
 
 func New(log *slog.Logger, refreshTokenSaver RefreshTokenSaver) http.HandlerFunc {
@@ -73,12 +74,12 @@ func New(log *slog.Logger, refreshTokenSaver RefreshTokenSaver) http.HandlerFunc
 			return
 		}
 
-		authorizationInfo := &models.Authorization{
+		authInfo := &models.Authorization{
 			UserGUID:         parsedGUID,
 			RefreshTokenHash: refreshTokenHash,
 		}
 
-		err = refreshTokenSaver.SaveRefreshTokenHash(authorizationInfo)
+		err = refreshTokenSaver.SaveRefreshTokenHash(authInfo, 5*time.Second)
 
 		responseOK(w, r, accessToken, refreshToken)
 	}

@@ -14,6 +14,7 @@ import (
 	"medods/internal/storage/mongo"
 	"net/http"
 	"os"
+	"time"
 )
 
 const (
@@ -30,14 +31,14 @@ func main() {
 	log.Info("App started", slog.String("env", cfg.Env))
 	log.Debug("Debugging started")
 
-	storage, err := mongo.New(cfg.Mongo.Uri)
+	storage, err := mongo.New(cfg.Mongo.Uri, 10*time.Second)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
 
 	defer func() {
-		if err := storage.Close(); err != nil {
+		if err := storage.Close(5 * time.Second); err != nil {
 			log.Error("failed to close storage", sl.Err(err))
 		}
 	}()

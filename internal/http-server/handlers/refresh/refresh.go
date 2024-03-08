@@ -5,11 +5,12 @@ import (
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
 	"log/slog"
-	"medods/internal/domain/models"
 	resp "medods/internal/lib/api/response"
 	"medods/internal/lib/jwt"
 	"medods/internal/lib/logger/sl"
+	"medods/internal/storage/models"
 	"net/http"
+	"time"
 )
 
 type Request struct {
@@ -23,8 +24,8 @@ type Response struct {
 }
 
 type TokensRefresher interface {
-	VerifyRefreshTokenHash(token string) (*models.Authorization, error)
-	SaveRefreshTokenHash(authToken *models.Authorization) error
+	VerifyRefreshTokenHash(token string, timeout time.Duration) (*models.Authorization, error)
+	SaveRefreshTokenHash(authToken *models.Authorization, timeout time.Duration) error
 }
 
 func New(log *slog.Logger, tokenRefresher TokensRefresher) http.HandlerFunc {
@@ -61,7 +62,7 @@ func New(log *slog.Logger, tokenRefresher TokensRefresher) http.HandlerFunc {
 			return
 		}
 
-		authInfo, err := tokenRefresher.VerifyRefreshTokenHash(req.RefreshToken)
+		authInfo, err := tokenRefresher.VerifyRefreshTokenHash(req.RefreshToken, 5*time.Second)
 		if err != nil {
 			log.Error("invalid refresh token", sl.Err(err))
 
@@ -92,7 +93,7 @@ func New(log *slog.Logger, tokenRefresher TokensRefresher) http.HandlerFunc {
 		}
 
 		authInfo.RefreshTokenHash = newRefreshTokenHash
-		err = tokenRefresher.SaveRefreshTokenHash(authInfo)
+		err = tokenRefresher.SaveRefreshTokenHash(authInfo, 5*time.Second)
 		if err != nil {
 			log.Error("failed to save new refresh token hash", sl.Err(err))
 			w.WriteHeader(http.StatusInternalServerError)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/crypto/bcrypt"
-	"medods/internal/domain/models"
+	"medods/internal/storage/models"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,10 +16,10 @@ type Storage struct {
 	client *mongo.Client
 }
 
-func New(uri string) (*Storage, error) {
+func New(uri string, timeout time.Duration) (*Storage, error) {
 	const op = "storage.mongo.New"
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
@@ -35,16 +35,16 @@ func New(uri string) (*Storage, error) {
 	return &Storage{client: client}, nil
 }
 
-func (s *Storage) Close() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func (s *Storage) Close(timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return s.client.Disconnect(ctx)
 }
 
-func (s *Storage) SaveRefreshTokenHash(authToken *models.Authorization) error {
+func (s *Storage) SaveRefreshTokenHash(authToken *models.Authorization, timeout time.Duration) error {
 	const op = "storage.mongoclient.SaveRefreshToken"
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	collection := s.client.Database("medodsDatabase").Collection("authorization")
@@ -56,10 +56,10 @@ func (s *Storage) SaveRefreshTokenHash(authToken *models.Authorization) error {
 	return nil
 }
 
-func (s *Storage) VerifyRefreshTokenHash(token string) (*models.Authorization, error) {
+func (s *Storage) VerifyRefreshTokenHash(token string, timeout time.Duration) (*models.Authorization, error) {
 	const op = "storage.mongoclient.VerifyRefreshTokenHash"
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	collection := s.client.Database("medodsDatabase").Collection("authorization")
